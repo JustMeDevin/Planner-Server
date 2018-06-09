@@ -1,5 +1,9 @@
 // The Cloud Functions for Firebase SDK to create Cloud Functions and setup triggers.
 const functions = require('firebase-functions');
+//const moment = require('moment');
+const moment = require('moment-timezone');
+
+moment.tz.setDefault("Pacific/Auckland");
 
 // The Firebase Admin SDK to access the Firebase Realtime Database.
 const admin = require('firebase-admin');
@@ -16,30 +20,40 @@ exports.notifyUsers = functions.database.ref('/plans/{ecclesiaId}/{year}/{date}/
       // You must return a Promise when performing asynchronous tasks inside a Functions such as
       // writing to the Firebase Realtime Database.
       // Setting an "uppercase" sibling in the Realtime Database returns a Promise.
-      //return change.ref.parent.child('uppercase').set(event);
-      if(afterData !== null ) {
-        //findUserIdsForNames(afterData, context.params.ecclesiaId)
-        checkIfNotificationNeeded(beforeData, afterData, context.params.ecclesiaId, context.params.eventid)
+
+      if(afterData !== null && isDateInWeek(context.params.date)) {
+        console.log("Will notify")
+        checkIfNotificationNeeded(beforeData, afterData, context.params.ecclesiaId, context.params.eventid, context.params.date)
+      } else {
+        console.log("No need to notify")
       }
 
       return true
 });
 
-function checkIfNotificationNeeded(beforeData, afterData, ecclesiaId, eventId){
+function checkIfNotificationNeeded(beforeData, afterData, ecclesiaId, eventId, date){
     if (beforeData.venue !== afterData.venue){
         console.log("will notify")
-        sendNotification(ecclesiaId, eventId, afterData.venue)
+        sendNotification(ecclesiaId, eventId, afterData.venue, date)
     }
 }
 
-function sendNotification(topic, eventId, newVenue){
+function isDateInWeek(dateString) {
+    var eventDate = moment(dateString, 'DD-MM-YYYY');
+    var currentDate = moment()
+    currentDate;
+    let isSameWeek = moment(eventDate).isSame(currentDate, 'week');
+    return isSameWeek;
+}
+
+function sendNotification(topic, eventId, newVenue, date){
 
     // See documentation on defining a message payload.
 
     var message = {
         notification: {
           title: 'Change to the plan',
-          body: 'CYC this weekend is now at ' + newVenue,
+          body: 'CYC this week is now at ' + newVenue,
         },
         android: {
           ttl: 3600 * 1000,
@@ -52,7 +66,11 @@ function sendNotification(topic, eventId, newVenue){
           payload: {
             aps: {
               badge: 0,
+              sound: "ping.aiff"
             },
+            data: {"eventId": eventId,
+                    "eventDate": date
+            }
           },
         },
         topic: topic
